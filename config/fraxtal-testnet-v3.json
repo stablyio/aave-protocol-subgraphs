@@ -1,0 +1,9 @@
+{
+  "network": "frax-testnet",
+  "AaveOracleAddress": "0x6E941e5248ad686eef46E3D8c25A8CcfbaA675F6",
+  "AaveOracleStartBlock": 9778941,
+  "PoolAddressesProviderRegistryAddress": "0x871A3c0B9E8C788c5297865cB527920E4D98a340",
+  "PoolAddressesProviderRegistryStartBlock": 9778096,
+  "RewardsControllerAddress": "0xAdfB2E2016D4c07c2aD444526bB41940B3F2DFAE",
+  "RewardsControllerStartBlock": 9779492
+}
