@@ -7,7 +7,7 @@
     "prepare:subgraph": "mustache ./config/${NETWORK}-${VERSION}.json ./templates/${BLOCKCHAIN}.subgraph.template.yaml > subgraph.yaml && rm -rf generated && npm run generate:schema && npm run subgraph:codegen && npm run subgraph:build",
     "subgraph:codegen": "graph codegen --output-dir ./generated",
     "subgraph:build": "graph build",
-    "subgraph:deploy:hosted": "graph deploy $SLUG --ipfs http://52.11.39.166:5001 --node http://52.11.39.166:8020",
+    "subgraph:deploy:hosted": "graph deploy $SLUG --ipfs http://52.11.39.166:5001 --node http://52.11.39.166:8020 --version-label 0.1.0",
     "deploy:hosted:mainnet": "VERSION=v2 BLOCKCHAIN=ethereum NETWORK=mainnet env-cmd npm run prepare:subgraph && SLUG=aave/protocol-v2 env-cmd npm run subgraph:deploy:hosted",
     "deploy:hosted:mainnet-v3": "VERSION=v3 BLOCKCHAIN=v3 NETWORK=mainnet env-cmd npm run prepare:subgraph && SLUG=aave/protocol-v3 env-cmd npm run subgraph:deploy:hosted",
     "deploy:hosted:goerli-v2": "VERSION=v2 BLOCKCHAIN=ethereum NETWORK=goerli env-cmd npm run prepare:subgraph && SLUG=aave/protocol-v2-goerli env-cmd npm run subgraph:deploy:hosted",

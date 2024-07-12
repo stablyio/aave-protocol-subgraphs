@@ -1,9 +1,9 @@
 {
   "network": "frax-testnet",
-  "AaveOracleAddress": "0x6E941e5248ad686eef46E3D8c25A8CcfbaA675F6",
-  "AaveOracleStartBlock": 9778941,
-  "PoolAddressesProviderRegistryAddress": "0x871A3c0B9E8C788c5297865cB527920E4D98a340",
-  "PoolAddressesProviderRegistryStartBlock": 9778096,
-  "RewardsControllerAddress": "0xAdfB2E2016D4c07c2aD444526bB41940B3F2DFAE",
-  "RewardsControllerStartBlock": 9779492
+  "AaveOracleAddress": "0x475153CeE7542B973b5cC62F6B7834CFD547Edb5",
+  "AaveOracleStartBlock": 10301890,
+  "PoolAddressesProviderRegistryAddress": "0x4E78Cb95a44AD8A1279D7d75786d45aa66C5157F",
+  "PoolAddressesProviderRegistryStartBlock": 10301424,
+  "RewardsControllerAddress": "0xd75197021020c83C5a90BfA4d5e9704C1D21d023",
+  "RewardsControllerStartBlock": 10302594
 }
