@@ -36,8 +36,8 @@ dataSources:
       eventHandlers:
         - event: AssetSourceUpdated(indexed address,indexed address)
           handler: handleAssetSourceUpdated
-        - event: FallbackOracleUpdated(indexed address)
-          handler: handleFallbackOracleUpdated
+        # - event: FallbackOracleUpdated(indexed address)
+        #   handler: handleFallbackOracleUpdated
         - event: BaseCurrencySet(indexed address,uint256)
           handler: handleBaseCurrencySet
       file: src/mapping/proxy-price-provider/v3.ts
