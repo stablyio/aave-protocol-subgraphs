@@ -35,7 +35,30 @@ export function updateAssetPriceFromAaveOracle(event: ethereum.Event): void {
     // save price to history
     savePriceToHistory(priceOracleAsset, event);
   } else {
-    log.error('Error in getting price from Liquidity Pool price feed for asset: {}', [
+    log.error('updateAssetPriceFromAaveOracle Error in getting price from Liquidity Pool price feed for asset: {}', [
+      assetAddress.toHexString(),
+    ]);
+  }
+}
+
+export function updateAssetPriceForAssetFromAaveOracle(assetAddress: Address): void {
+  let priceOracle = getOrInitPriceOracle();
+  let priceOracleAsset = getPriceOracleAsset(assetAddress.toHexString());
+  let proxyPriceProvider = AaveOracle.bind(
+    Address.fromString(priceOracle.proxyPriceProvider.toHexString())
+  );
+
+  let assetPriceCall = proxyPriceProvider.try_getAssetPrice(assetAddress);
+  if (!assetPriceCall.reverted) {
+    priceOracleAsset.priceInEth = assetPriceCall.value;
+    priceOracleAsset.save();
+
+    // log.info(`updateAssetPriceFromAaveOracle value: {}`, [assetPriceCall.value.toString()])
+
+    // save price to history
+    // savePriceToHistory(priceOracleAsset, event);
+  } else {
+    log.error('updateAssetPriceFromAaveOracle Error in getting price from Liquidity Pool price feed for asset: {}', [
       assetAddress.toHexString(),
     ]);
   }
