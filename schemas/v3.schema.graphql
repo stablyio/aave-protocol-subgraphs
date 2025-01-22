@@ -121,7 +121,20 @@ type SubToken @entity {
   tokenContractImpl: Bytes
   underlyingAssetAddress: Bytes!
   underlyingAssetDecimals: Int!
+  incentiveAPR: BigInt!
   rewards: [Reward!]! @derivedFrom(field: "asset")
+  hourlySnapshots: [SubTokenHourlyHistoryItem!]! @derivedFrom(field: "subtoken")
+}
+
+type SubTokenHourlyHistoryItem @entity @hourlySnapshot {
+  " { # of hours since Unix epoch time } "
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+
+  subtoken: SubToken!
+
+  incentiveAPR: BigInt!
 }
 
 type Referrer @entity {
@@ -399,6 +412,7 @@ type ReserveParamsHistoryItem @entity {
   stableBorrowRate: BigInt!
   averageStableBorrowRate: BigInt!
   liquidityIndex: BigInt!
+  totalSupplies: BigInt!
   liquidityRate: BigInt!
   totalLiquidity: BigInt!
   totalATokenSupply: BigInt!
@@ -407,6 +421,7 @@ type ReserveParamsHistoryItem @entity {
   priceInEth: BigInt!
   priceInUsd: BigDecimal!
   timestamp: Int!
+  blockNumber: BigInt!
   accruedToTreasury: BigInt!
   totalScaledVariableDebt: BigInt!
   totalCurrentVariableDebt: BigInt!
@@ -451,6 +466,7 @@ type Reward @entity {
   rewardTokenDecimals: Int!
   rewardFeedOracle: RewardFeedOracle!
   rewardTokenSymbol: String!
+  rewardPriceFeed: BigInt!
   index: BigInt!
   precision: Int!
   distributionEnd: Int!

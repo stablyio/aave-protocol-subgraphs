@@ -1,4 +1,4 @@
-import { Bytes, ethereum, log } from '@graphprotocol/graph-ts';
+import { BigInt, Bytes, ethereum, log } from '@graphprotocol/graph-ts';
 import {
   SubToken,
   PriceOracle,
@@ -12,15 +12,18 @@ import {
   ChainlinkAggregator,
   ContractToPoolMapping,
   Protocol,
+  SubTokenHourlyHistoryItem,
 } from '../../../generated/schema';
 import {
   PRICE_ORACLE_ASSET_PLATFORM_SIMPLE,
+  PRICE_ORACLE_ASSET_TYPE_COMPOSITE,
   PRICE_ORACLE_ASSET_TYPE_SIMPLE,
   zeroAddress,
   zeroBD,
   zeroBI,
 } from '../../utils/converters';
 import { getReserveId, getUserReserveId } from '../../utils/id-generation';
+import { SECONDS_PER_HOUR } from '../../utils/constants';
 
 export function getProtocol(): Protocol {
   let protocolId = '1';
@@ -124,7 +127,7 @@ export function getPriceOracleAsset(id: string, save: boolean = true): PriceOrac
     priceOracleReserve.oracle = getOrInitPriceOracle().id;
     priceOracleReserve.priceSource = zeroAddress();
     priceOracleReserve.dependentAssets = [];
-    priceOracleReserve.type = PRICE_ORACLE_ASSET_TYPE_SIMPLE;
+    priceOracleReserve.type = PRICE_ORACLE_ASSET_TYPE_COMPOSITE;
     priceOracleReserve.platform = PRICE_ORACLE_ASSET_PLATFORM_SIMPLE;
     priceOracleReserve.priceInEth = zeroBI();
     priceOracleReserve.isFallbackRequired = false;
@@ -242,6 +245,12 @@ export function getChainlinkAggregator(id: string): ChainlinkAggregator {
   return chainlinkAggregator as ChainlinkAggregator;
 }
 
+export function getSubToken(subTokenAddress: Bytes): SubToken | null {
+  let sTokenId = subTokenAddress.toHexString();
+  let sToken = SubToken.load(sTokenId);
+  return sToken;
+}
+
 export function getOrInitSubToken(subTokenAddress: Bytes): SubToken {
   let sTokenId = subTokenAddress.toHexString();
   let sToken = SubToken.load(sTokenId);
@@ -249,6 +258,7 @@ export function getOrInitSubToken(subTokenAddress: Bytes): SubToken {
     sToken = new SubToken(sTokenId);
     sToken.underlyingAssetAddress = new Bytes(1);
     sToken.pool = '';
+    sToken.incentiveAPR = BigInt.zero();
     sToken.underlyingAssetDecimals = 18;
   }
   return sToken as SubToken;
@@ -342,4 +352,24 @@ export function createMapContractToPool(_contractAddress: Bytes, pool: string): 
   contractToPoolMapping = new ContractToPoolMapping(contractAddress);
   contractToPoolMapping.pool = pool;
   contractToPoolMapping.save();
+}
+
+export function getOrInitSubTokenHourlyHistoryItem(
+  blockNumber: BigInt,
+  blockTimestamp: BigInt,
+  subtokenId: string
+): SubTokenHourlyHistoryItem {
+  const hours = blockTimestamp.toI32() / SECONDS_PER_HOUR;
+  const id = Bytes.fromI32(hours);
+
+  let subTokenHourlyHistoryItem = SubTokenHourlyHistoryItem.load(id);
+  if (!subTokenHourlyHistoryItem) {
+    subTokenHourlyHistoryItem = new SubTokenHourlyHistoryItem(id);
+    subTokenHourlyHistoryItem.blockNumber = blockNumber;
+    subTokenHourlyHistoryItem.timestamp = blockTimestamp;
+    subTokenHourlyHistoryItem.subtoken = subtokenId;
+    subTokenHourlyHistoryItem.incentiveAPR = BigInt.zero();
+    subTokenHourlyHistoryItem.save();
+  }
+  return subTokenHourlyHistoryItem as SubTokenHourlyHistoryItem;
 }

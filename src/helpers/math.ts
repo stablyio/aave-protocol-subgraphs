@@ -1,9 +1,9 @@
-import { Address, BigInt, ethereum, log } from '@graphprotocol/graph-ts';
+import { BigInt } from '@graphprotocol/graph-ts';
 import { zeroBI } from '../utils/converters';
 
-let RAY = BigInt.fromI32(10).pow(27);
-let WAD_RAY_RATIO = BigInt.fromI32(10).pow(9);
-let WAD = BigInt.fromI32(10).pow(18);
+export let RAY = BigInt.fromI32(10).pow(27);
+export let WAD_RAY_RATIO = BigInt.fromI32(10).pow(9);
+export let WAD = BigInt.fromI32(10).pow(18);
 let halfRAY = RAY.div(BigInt.fromI32(2));
 let SECONDS_PER_YEAR = BigInt.fromI32(31556952);
 
@@ -30,6 +30,24 @@ export function rayMul(a: BigInt, b: BigInt): BigInt {
   result = result.plus(halfRAY);
   let mult = result.div(RAY);
   return mult;
+}
+
+//TODO: Write the unit test
+export function rayPow(a: BigInt, p: BigInt): BigInt {
+  let x = a;
+  let n = p;
+  const binaryBigInt = BigInt.fromI32(2);
+  let z = n.mod(binaryBigInt).isZero() ? RAY : x;
+
+  for (n = n.div(binaryBigInt); !n.isZero(); n = n.div(binaryBigInt)) {
+    x = rayMul(x, x);
+
+    if (!n.mod(binaryBigInt).isZero()) {
+      z = rayMul(z, x);
+    }
+  }
+
+  return z;
 }
 
 export function calculateCompoundedInterest(
