@@ -36,8 +36,8 @@ dataSources:
       eventHandlers:
         - event: AssetSourceUpdated(indexed address,indexed address)
           handler: handleAssetSourceUpdated
-        # - event: FallbackOracleUpdated(indexed address)
-        #   handler: handleFallbackOracleUpdated
+        - event: FallbackOracleUpdated(indexed address)
+          handler: handleFallbackOracleUpdated
         - event: BaseCurrencySet(indexed address,uint256)
           handler: handleBaseCurrencySet
       file: src/mapping/proxy-price-provider/v3.ts
@@ -105,6 +105,7 @@ dataSources:
     name: RewardsController
     network: {{network}}
     source:
+      # Get address from IncentivesProxy.json
       address: '{{RewardsControllerAddress}}'
       abi: RewardsController
       startBlock: {{RewardsControllerStartBlock}}
@@ -209,6 +210,8 @@ templates:
           file: ./abis/v3/RewardsController.json
         - name: Pool
           file: ./abis/v3/Pool.json
+        - name: AaveOracle
+          file: ./abis/v3/AaveOracle.json
       eventHandlers:
         - event: Burn(indexed address,indexed address,uint256,uint256,uint256)
           handler: handleATokenBurn
@@ -238,6 +241,8 @@ templates:
           file: ./abis/helpers/IERC20Detailed.json
         - name: RewardsController
           file: ./abis/v3/RewardsController.json
+        - name: AaveOracle
+          file: ./abis/v3/AaveOracle.json
       eventHandlers:
         - event: Burn(indexed address,uint256,uint256,uint256,uint256,uint256)
           handler: handleStableTokenBurn
@@ -267,6 +272,8 @@ templates:
           file: ./abis/helpers/IERC20Detailed.json
         - name: RewardsController
           file: ./abis/v3/RewardsController.json
+        - name: AaveOracle
+          file: ./abis/v3/AaveOracle.json
       eventHandlers:
         - event: Burn(indexed address,indexed address,uint256,uint256,uint256)
           handler: handleVariableTokenBurn
@@ -413,6 +420,8 @@ templates:
       abis:
         - name: Pool
           file: ./abis/v3/Pool.json
+        - name: AaveOracle
+          file: ./abis/v3/AaveOracle.json
       eventHandlers:
         - event: Supply(indexed address,address,indexed address,uint256,indexed uint16)
           handler: handleSupply

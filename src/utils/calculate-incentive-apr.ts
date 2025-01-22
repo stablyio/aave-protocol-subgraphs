@@ -1,5 +1,7 @@
-import { BigDecimal, BigInt, log } from '@graphprotocol/graph-ts';
-import { ETH_PRECISION, SECONDS_PER_YEAR } from './constants';
+import { BigInt, log } from '@graphprotocol/graph-ts';
+import { ETH_PRECISION_DECIMALS, SECONDS_PER_YEAR } from './constants';
+import { rayDiv, wadToRay } from '../helpers/math';
+import { exponentToBigInt } from './converters';
 
 export interface CalculateIncentiveAPRRequest {
   emissionPerSecond: BigInt;
@@ -11,63 +13,60 @@ export interface CalculateIncentiveAPRRequest {
 }
 
 // Calculate the APR for an incentive emission
-// export function calculateIncentiveAPR({
-//   emissionPerSecond,
-//   rewardTokenPriceInMarketReferenceCurrency,
-//   priceInMarketReferenceCurrency,
-//   totalTokenSupply,
-//   decimals,
-//   rewardTokenDecimals,
-// }: CalculateIncentiveAPRRequest): BigDecimal
 export function calculateIncentiveAPR(
-  emissionPerSecond: BigInt,
-  rewardTokenPriceInMarketReferenceCurrency: BigInt, // Can be priced in ETH or USD depending on market
-  totalTokenSupply: BigInt,
-  priceInMarketReferenceCurrency: BigInt, // Can be priced in ETH or USD depending on market
+  emissionPerSecond: BigInt, // number of tokens issued every second (not was, not RAY)
+  rewardTokenPriceInMarketReferenceCurrency: BigInt, // Can be priced in ETH or USD depending on market (WAD)
+  totalTokenSupply: BigInt, // WAD
+  priceInMarketReferenceCurrency: BigInt, // Can be priced in ETH or USD depending on market (WAD)
   decimals: BigInt,
   rewardTokenDecimals: BigInt
-): BigDecimal {
-  // const rewardTokenDecimalsPow = BigInt.fromI32(10)
-  //   .pow(rewardTokenDecimals.toU32())
-  //   .toBigDecimal();
-  // const decimalsPow = BigInt.fromI32(10)
-  //   .pow(decimals.toU32())
-  //   .toBigDecimal();
+): BigInt {
+  const rewardTokenDecimalDiff = ETH_PRECISION_DECIMALS.minus(rewardTokenDecimals);
+  const targetTokenDecimalDiff = ETH_PRECISION_DECIMALS.minus(decimals);
+  const rewardTokenDecimalDiffWad = exponentToBigInt(rewardTokenDecimalDiff.toI32())
+  const targetTokenDecimalDiffWad = exponentToBigInt(targetTokenDecimalDiff.toI32())
+  
+  const emissionPerSecondWAD = emissionPerSecond
+    // multiply the price of the token in ETH unit
+    .times(rewardTokenPriceInMarketReferenceCurrency)
+    // convert emissionPerSecond to WAD
+    .times(rewardTokenDecimalDiffWad);
 
-  const rewardTokenPriceNormalized = rewardTokenPriceInMarketReferenceCurrency
-    .toBigDecimal()
-    // .div(ETH_PRECISION);
-  const emissionPerSecondNormalized = emissionPerSecond
-    .toBigDecimal()
-    .truncate(rewardTokenDecimals.toI32())
-    .times(rewardTokenPriceNormalized);
-
-  if (emissionPerSecondNormalized.equals(BigDecimal.zero())) {
-    return BigDecimal.zero();
+  if (emissionPerSecondWAD.isZero()) {
+    // log.info(`calculateIncentiveAPR zero {} {} {} {} {}`, [
+    //   rewardTokenDecimalDiff.toString(),
+    //   targetTokenDecimalDiff.toString(),
+    //   emissionPerSecondWAD.toString(),
+    //   rewardTokenPriceInMarketReferenceCurrency.toString(),
+    //   rewardTokenDecimalDiffWad.toString(),
+    //   targetTokenDecimalDiffWad.toString()
+    // ]);
+    return BigInt.zero();
   }
 
-  const emissionPerYear = emissionPerSecondNormalized.times(SECONDS_PER_YEAR.toBigDecimal());
+  const emissionPerYearWAD = emissionPerSecondWAD.times(SECONDS_PER_YEAR);
 
-  const priceInMarketReferenceCurrencyNormalized = priceInMarketReferenceCurrency
-    .toBigDecimal()
-    // .div(ETH_PRECISION);
-  const totalSupplyNormalized = totalTokenSupply
-    .toBigDecimal()
-    .truncate(decimals.toI32())
-    .times(priceInMarketReferenceCurrencyNormalized);
 
-  const result = emissionPerYear.div(totalSupplyNormalized);
+  const totalSupplyWAD = totalTokenSupply
+    .times(priceInMarketReferenceCurrency)
+    .times(targetTokenDecimalDiffWad);
 
-  log.info(`calculateIncentiveAPR {} {} {} {} {} {} {} {}`, [
-    emissionPerSecondNormalized.toString(),
-    rewardTokenDecimals.toString(),
-    rewardTokenPriceNormalized.toString(),
-    totalTokenSupply.toString(),
-    decimals.toString(),
-    totalSupplyNormalized.toString(),
-    priceInMarketReferenceCurrencyNormalized.toString(),
-    result.toString(),
-  ]);
+  // Convert WAD to RAY before dividing
+  const result = rayDiv(wadToRay(emissionPerYearWAD), wadToRay(totalSupplyWAD));
 
+  // log.info(`calculateIncentiveAPR {} {} {} {} {} {} {} {} {} {}`, [
+  //   rewardTokenDecimalDiff.toString(),
+  //   targetTokenDecimalDiff.toString(),
+  //   emissionPerSecondWAD.toString(),
+  //   emissionPerYearWAD.toString(),
+  //   wadToRay(emissionPerYearWAD).toString(),
+  //   totalTokenSupply.toString(),
+  //   totalSupplyWAD.toString(),
+  //   result.toString(),
+  //   rewardTokenPriceInMarketReferenceCurrency.toString(),
+  //   priceInMarketReferenceCurrency.toString()
+  // ]);
+
+  // convert the normal value into
   return result;
 }

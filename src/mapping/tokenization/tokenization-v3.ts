@@ -32,6 +32,8 @@ import {
   getPriceOracleAsset,
   getOrInitReserveParamsHistoryItem,
   getPoolByContract,
+  getSubToken,
+  getOrInitSubTokenHourlyHistoryItem,
 } from '../../helpers/v3/initializers';
 import { getUpdateBlock, zeroBI } from '../../utils/converters';
 import { calculateUtilizationRate } from '../../helpers/reserve-logic';
@@ -39,6 +41,9 @@ import { Address, BigInt, Bytes, ethereum, log } from '@graphprotocol/graph-ts';
 import { rayDiv, rayMul } from '../../helpers/math';
 import { getHistoryEntityId } from '../../utils/id-generation';
 import { dataSource } from '@graphprotocol/graph-ts';
+import { updateAssetPriceForAssetFromAaveOracle } from '../../helpers/v3/price-updates';
+import { updatePriceFeed } from '../incentives-controller/v3';
+import { calculateIncentiveAPR } from '../../utils/calculate-incentive-apr';
 
 // TODO: check if we need to add stuff to history
 function saveUserReserveAHistory(
@@ -126,6 +131,7 @@ function saveReserve(reserve: Reserve, event: ethereum.Event): void {
   reserveParamsHistoryItem.variableBorrowIndex = reserve.variableBorrowIndex;
   reserveParamsHistoryItem.stableBorrowRate = reserve.stableBorrowRate;
   reserveParamsHistoryItem.liquidityIndex = reserve.liquidityIndex;
+  reserveParamsHistoryItem.totalSupplies = reserve.totalSupplies;
   reserveParamsHistoryItem.liquidityRate = reserve.liquidityRate;
   reserveParamsHistoryItem.totalATokenSupply = reserve.totalATokenSupply;
   reserveParamsHistoryItem.averageStableBorrowRate = reserve.averageStableRate;
@@ -136,7 +142,46 @@ function saveReserve(reserve: Reserve, event: ethereum.Event): void {
   reserveParamsHistoryItem.priceInUsd = reserveParamsHistoryItem.priceInEth.toBigDecimal();
 
   reserveParamsHistoryItem.timestamp = event.block.timestamp.toI32();
+  reserveParamsHistoryItem.blockNumber = event.block.number;
   reserveParamsHistoryItem.save();
+}
+
+function updateSubToken(
+  vTokenAddress: string,
+  priceOracleAddress: string,
+  totalSupplies: BigInt,
+  poolDecimals: BigInt,
+  blockNumber: BigInt,
+  blockTimestamp: BigInt,
+): void {
+  const vToken = getSubToken(Bytes.fromHexString(vTokenAddress));
+  if (vToken != null) {
+    const rewards = vToken.rewards.load();
+    if (rewards.length > 0) {
+      const reward = rewards[0];
+      const priceOracleAsset = getPriceOracleAsset(priceOracleAddress, false);
+      if (priceOracleAsset != null) {
+        const priceOfToken = priceOracleAsset.priceInEth;
+        // try to use the first for now
+        const vTokenAPR = calculateIncentiveAPR(
+          reward.emissionsPerSecond,
+          reward.rewardPriceFeed,
+          totalSupplies,
+          priceOfToken,
+          poolDecimals,
+          BigInt.fromI32(reward.rewardTokenDecimals)
+        );
+        vToken.incentiveAPR = vTokenAPR;
+        vToken.save();
+
+        const subTokenHistoryItem = getOrInitSubTokenHourlyHistoryItem(blockNumber, blockTimestamp, vToken.id)
+        subTokenHistoryItem.incentiveAPR = vTokenAPR
+        subTokenHistoryItem.save()
+      }
+    }
+  } else {
+    log.error(`tokenMint failed to getSubToken`, []);
+  }
 }
 
 function tokenBurn(
@@ -157,6 +202,8 @@ function tokenBurn(
   userReserve.currentATokenBalance = rayMul(userReserve.scaledATokenBalance, index);
   userReserve.variableBorrowIndex = poolReserve.variableBorrowIndex;
   userReserve.liquidityRate = poolReserve.liquidityRate;
+
+  updateAssetPriceForAssetFromAaveOracle(Address.fromBytes(poolReserve.underlyingAsset));
 
   // TODO: review liquidity?
   poolReserve.totalSupplies = poolReserve.totalSupplies.minus(userBalanceChange);
@@ -180,6 +227,14 @@ function tokenBurn(
   userReserve.lastUpdateTimestamp = event.block.timestamp.toI32();
   userReserve.save();
   saveUserReserveAHistory(userReserve, event, index);
+  updateSubToken(
+    poolReserve.vToken,
+    poolReserve.price,
+    poolReserve.totalSupplies,
+    BigInt.fromI32(poolReserve.decimals),
+    event.block.number,
+    event.block.timestamp,
+  );
 }
 
 function tokenMint(
@@ -211,6 +266,11 @@ function tokenMint(
     }
   }
 
+  updateAssetPriceForAssetFromAaveOracle(Address.fromBytes(poolReserve.underlyingAsset));
+  updatePriceFeed(
+    '0x35fe3ccf702704d11a83a33317764bc4cd4aa38a:0xad54dd763ba6f9948e2eccf0350c1dafa0413d15:0x4d6e79013212f10a026a1fb0b926c9fd0432b96c'
+  );
+
   // Check if we are minting to treasury for mainnet and polygon
   if (
     onBehalf.toHexString() != '0xB2289E329D2F85F1eD31Adbb30eA345278F21bcf'.toLowerCase() &&
@@ -219,7 +279,7 @@ function tokenMint(
     onBehalf.toHexString() != '0x5ba7fd868c40c16f7aDfAe6CF87121E13FC2F7a0'.toLowerCase() &&
     onBehalf.toHexString() != '0x8A020d92D6B119978582BE4d3EdFdC9F7b28BF31'.toLowerCase() &&
     onBehalf.toHexString() != '0x053D55f9B5AF8694c503EB288a1B7E552f590710'.toLowerCase() &&
-    onBehalf.toHexString() != '0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c'.toLowerCase() 
+    onBehalf.toHexString() != '0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c'.toLowerCase()
   ) {
     let userReserve = getOrInitUserReserve(onBehalf, aToken.underlyingAssetAddress, event);
     let calculatedAmount = rayDiv(userBalanceChange, index);
@@ -248,8 +308,42 @@ function tokenMint(
         userBalanceChange
       );
     }
+    // const vToken = getSubToken(Bytes.fromHexString(poolReserve.vToken));
+    // if (vToken != null) {
+    //   const rewards = vToken.rewards.load();
+    //   if (rewards.length > 0) {
+    //     const reward = rewards[0];
+    //     const priceOracleAsset = getPriceOracleAsset(poolReserve.price, false);
+    //     if (priceOracleAsset != null) {
+    //       const priceOfToken = priceOracleAsset.priceInEth;
+    //       // try to use the first for now
+    //       const vTokenAPR = calculateIncentiveAPR(
+    //         reward.emissionsPerSecond,
+    //         reward.rewardPriceFeed,
+    //         priceOfToken,
+    //         poolReserve.totalSupplies,
+    //         BigInt.fromI32(poolReserve.decimals),
+    //         BigInt.fromI32(reward.rewardTokenDecimals)
+    //       );
+    //       vToken.incentiveAPR = vTokenAPR;
+    //       log.info(`tokenMint vTokenAPR {}`, [vTokenAPR.toString()]);
+    //       vToken.save();
+    //     }
+    //   }
+    // } else {
+    //   log.error(`tokenMint failed to getSubToken`, []);
+    // }
+
     saveReserve(poolReserve, event);
     saveUserReserveAHistory(userReserve, event, index);
+    updateSubToken(
+      poolReserve.vToken,
+      poolReserve.price,
+      poolReserve.totalSupplies,
+      BigInt.fromI32(poolReserve.decimals),
+      event.block.number,
+      event.block.timestamp
+    );
   } else {
     poolReserve.lifetimeReserveFactorAccrued = poolReserve.lifetimeReserveFactorAccrued.plus(
       userBalanceChange

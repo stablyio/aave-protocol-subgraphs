@@ -65,15 +65,16 @@ export function handleFallbackOracleUpdated(event: FallbackOracleUpdated): void 
 
     // update USDETH price
     let fallbackOracle = FallbackPriceOracle.bind(event.params.fallbackOracle);
-    let ethUsdPrice = formatUsdEthChainlinkPrice(
-      fallbackOracle.getAssetPrice(Address.fromString(MOCK_USD_ADDRESS))
-    );
+    let mockUsdAddressResult = fallbackOracle.try_getAssetPrice(Address.fromString(MOCK_USD_ADDRESS))
+    if (!mockUsdAddressResult.reverted) {
+      let ethUsdPrice = formatUsdEthChainlinkPrice(mockUsdAddressResult.value);
 
-    if (
-      priceOracle.usdPriceEthFallbackRequired ||
-      priceOracle.usdPriceEthMainSource.equals(zeroAddress())
-    ) {
-      usdEthPriceUpdate(priceOracle, ethUsdPrice, event);
+      if (
+        priceOracle.usdPriceEthFallbackRequired ||
+        priceOracle.usdPriceEthMainSource.equals(zeroAddress())
+      ) {
+        usdEthPriceUpdate(priceOracle, ethUsdPrice, event);
+      }
     }
   }
 }

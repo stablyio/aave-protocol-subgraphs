@@ -17,6 +17,8 @@ import {
 import { getOrInitUser } from '../../helpers/v3/initializers';
 import { getHistoryEntityId } from '../../utils/id-generation';
 import { IERC20Detailed } from '../../../generated/RewardsController/IERC20Detailed';
+import { AaveOracle } from '../../../generated/AaveOracle/AaveOracle';
+import { Address, BigInt, log } from '@graphprotocol/graph-ts';
 
 export function handleEmissionManagerUpdated(event: EmissionManagerUpdated): void {
   const rewardsController = event.address;
@@ -60,6 +62,7 @@ export function handleAssetConfigUpdated(event: AssetConfigUpdated): void {
     rewardIncentive.precision = iController.getAssetDecimals(asset);
 
     rewardIncentive.createdAt = blockTimestamp;
+    rewardIncentive.rewardPriceFeed = BigInt.zero();
 
     // get oracle
     let oracle = RewardFeedOracle.load(reward.toHexString());
@@ -69,6 +72,12 @@ export function handleAssetConfigUpdated(event: AssetConfigUpdated): void {
       oracle.rewardFeedAddress = rewardOracle;
       oracle.createdAt = blockTimestamp;
       oracle.updatedAt = blockTimestamp;
+
+      let rewardAaveOracle = AaveOracle.bind(rewardOracle);
+      const getAssetPriceResult = rewardAaveOracle.try_getAssetPrice(reward);
+      if (!getAssetPriceResult.reverted) {
+        rewardIncentive.rewardPriceFeed = getAssetPriceResult.value;
+      }
     }
 
     rewardIncentive.rewardFeedOracle = oracle.id;
@@ -169,4 +178,27 @@ export function handleRewardOracleUpdated(event: RewardOracleUpdated): void {
   rewardOracle.updatedAt = blockTimestamp;
 
   rewardOracle.save();
+}
+
+export function updatePriceFeed(rewardIncentiveId: string): void {
+  let rewardIncentive = Reward.load(rewardIncentiveId);
+
+  if (!rewardIncentive) {
+    return
+  }
+  const reward = rewardIncentive.rewardToken
+
+  let rewardOracle = RewardFeedOracle.load(reward.toHexString());
+  if (rewardOracle) {
+    let rewardAaveOracle = AaveOracle.bind(Address.fromBytes(rewardOracle.rewardFeedAddress));
+    let rewardAddress = Address.fromBytes(reward)
+    const getAssetPriceResult = rewardAaveOracle.try_getAssetPrice(rewardAddress);
+    if (!getAssetPriceResult.reverted) {
+      rewardIncentive.rewardPriceFeed = getAssetPriceResult.value;
+      rewardIncentive.save()
+      // log.info(`updatePriceFeed try_getAssetPrice: {}`, [getAssetPriceResult.value.toString()])
+    } else {
+      log.error(`updatePriceFeed fail`, [])
+    }
+  }
 }
