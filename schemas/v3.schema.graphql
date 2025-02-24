@@ -471,6 +471,7 @@ type Reward @entity {
   precision: Int!
   distributionEnd: Int!
   emissionsPerSecond: BigInt!
+  cumulativeEmissionTokens: BigInt!
   rewardsController: RewardsController!
   createdAt: Int!
   updatedAt: Int!

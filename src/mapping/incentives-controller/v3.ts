@@ -63,6 +63,7 @@ export function handleAssetConfigUpdated(event: AssetConfigUpdated): void {
 
     rewardIncentive.createdAt = blockTimestamp;
     rewardIncentive.rewardPriceFeed = BigInt.zero();
+    rewardIncentive.cumulativeEmissionTokens = BigInt.zero();
 
     // get oracle
     let oracle = RewardFeedOracle.load(reward.toHexString());
@@ -85,6 +86,24 @@ export function handleAssetConfigUpdated(event: AssetConfigUpdated): void {
 
   rewardIncentive.index = event.params.assetIndex;
   rewardIncentive.distributionEnd = distributionEnd.toI32();
+
+  // Calculate the accmulative
+  if (rewardIncentive.updatedAt > 0) {
+    const diffBlockTime = blockTimestamp - rewardIncentive.updatedAt;
+    // use the previous emission to calculate
+    const newEmissionSecondsFromLastTime = rewardIncentive.emissionsPerSecond.times(
+      BigInt.fromI32(diffBlockTime)
+    );
+    rewardIncentive.cumulativeEmissionTokens = rewardIncentive.cumulativeEmissionTokens.plus(
+      newEmissionSecondsFromLastTime
+    );
+    // log.info('reward emission {} {} {}', [
+    //   diffBlockTime.toString(),
+    //   newEmissionSecondsFromLastTime.toString(),
+    //   rewardIncentive.emissionsPerSecond.toString(),
+    // ]);
+  }
+
   rewardIncentive.emissionsPerSecond = emissionsPerSecond;
   rewardIncentive.updatedAt = blockTimestamp;
   rewardIncentive.save();
@@ -184,21 +203,21 @@ export function updatePriceFeed(rewardIncentiveId: string): void {
   let rewardIncentive = Reward.load(rewardIncentiveId);
 
   if (!rewardIncentive) {
-    return
+    return;
   }
-  const reward = rewardIncentive.rewardToken
+  const reward = rewardIncentive.rewardToken;
 
   let rewardOracle = RewardFeedOracle.load(reward.toHexString());
   if (rewardOracle) {
     let rewardAaveOracle = AaveOracle.bind(Address.fromBytes(rewardOracle.rewardFeedAddress));
-    let rewardAddress = Address.fromBytes(reward)
+    let rewardAddress = Address.fromBytes(reward);
     const getAssetPriceResult = rewardAaveOracle.try_getAssetPrice(rewardAddress);
     if (!getAssetPriceResult.reverted) {
       rewardIncentive.rewardPriceFeed = getAssetPriceResult.value;
-      rewardIncentive.save()
+      rewardIncentive.save();
       // log.info(`updatePriceFeed try_getAssetPrice: {}`, [getAssetPriceResult.value.toString()])
     } else {
-      log.error(`updatePriceFeed fail`, [])
+      log.error(`updatePriceFeed fail`, []);
     }
   }
 }
